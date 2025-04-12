@@ -1,0 +1,8 @@
+com\smarthome\model\SmartDevice.class
+com\smarthome\SmartHomeApplication.class
+com\smarthome\model\SmartLight.class
+com\smarthome\model\SmartSpeaker.class
+com\smarthome\model\SmartThermostat.class
+com\smarthome\controller\SmartHomeController.class
+com\smarthome\model\SecurityCamera.class
+com\smarthome\model\SmartPlug.class
