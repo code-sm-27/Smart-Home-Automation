@@ -6,7 +6,7 @@ import com.smarthome.model.*; // Adjust the package path as necessary
 import java.util.ArrayList;
 import java.util.List;
 
-@CrossOrigin(origins = "http://localhost:3000") // Enable cross-origin requests from React
+@CrossOrigin(origins = "*") // Allow all origins for easier deployment
 @RestController
 @RequestMapping("/api")
 public class SmartHomeController {
