@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle, Moon, Sun } from "lucide-react"
@@ -11,6 +12,8 @@ import type { DeviceData } from "@/lib/utils"
 import RoomView from "./room-view"
 import DashboardHeader from "./dashboard-header"
 import FloorPlan from "./floor-plan"
+import { Client } from "@stomp/stompjs"
+import SockJS from "sockjs-client"
 
 export default function Dashboard() {
   const [devices, setDevices] = useState<DeviceData[]>([])
@@ -18,22 +21,18 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null)
   const [view, setView] = useState<"rooms" | "floorplan">("rooms")
   const { theme, setTheme } = useTheme()
+  const router = useRouter()
 
-  // Use a more efficient way to fetch data that won't cause flickering
   const loadDevices = useCallback(async () => {
     try {
       setLoading(true)
       const data = await fetchDevices()
-
-      // Only update state if the data has actually changed
-      // This helps prevent unnecessary re-renders
       if (JSON.stringify(data) !== JSON.stringify(devices)) {
         setDevices(data)
       }
-
       setError(null)
     } catch (err) {
-      setError("Failed to load devices. Please check your connection.")
+      setError("Failed to load devices. Please check your connection or login again.")
       console.error(err)
     } finally {
       setLoading(false)
@@ -41,15 +40,43 @@ export default function Dashboard() {
   }, [devices])
 
   useEffect(() => {
+    const token = localStorage.getItem("token")
+    if (!token) {
+      router.push("/login")
+      return
+    }
+
     loadDevices()
 
-    // Use a less frequent refresh interval to reduce flickering
-    const interval = setInterval(() => {
-      loadDevices()
-    }, 30000) // 30 seconds instead of 10
+    // Setup WebSocket
+    const socketUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || "http://localhost:8080"
+    const socket = new SockJS(`${socketUrl}/ws-endpoint`)
+    const stompClient = new Client({
+      webSocketFactory: () => socket,
+      connectHeaders: {
+        Authorization: `Bearer ${token}`,
+      },
+      onConnect: () => {
+        console.log("Connected to WebSocket")
+        stompClient.subscribe('/topic/devices', (message) => {
+          if (message.body) {
+            const updatedDevice = JSON.parse(message.body)
+            setDevices(prev => prev.map(d => d.deviceId === updatedDevice.deviceId ? updatedDevice : d))
+          }
+        })
+      },
+      onStompError: (frame) => {
+        console.error('Broker reported error: ' + frame.headers['message'])
+        console.error('Additional details: ' + frame.body)
+      }
+    })
 
-    return () => clearInterval(interval)
-  }, [loadDevices])
+    stompClient.activate()
+
+    return () => {
+      stompClient.deactivate()
+    }
+  }, [])
 
   const handleDeviceUpdate = useCallback(() => {
     loadDevices()

@@ -2,80 +2,69 @@ import type { DeviceData } from "./utils"
 
 const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api"
 const cleanApiUrl = rawApiUrl.endsWith("/") ? rawApiUrl.slice(0, -1) : rawApiUrl
-const API_BASE_URL = cleanApiUrl.endsWith("/api") ? cleanApiUrl : `${cleanApiUrl}/api`
+export const API_BASE_URL = cleanApiUrl.endsWith("/api") ? cleanApiUrl : `${cleanApiUrl}/api`
+
+function getAuthHeaders() {
+  const token = localStorage.getItem("token")
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  }
+}
 
 export async function fetchDevices(): Promise<DeviceData[]> {
   const response = await fetch(`${API_BASE_URL}/devices`, {
-    // Add cache: 'no-store' to prevent browser caching which can cause flickering
+    headers: getAuthHeaders(),
     cache: "no-store",
   })
 
   if (!response.ok) {
+    if (response.status === 401) {
+      window.location.href = "/login"
+    }
     throw new Error(`Failed to fetch devices: ${response.status}`)
   }
 
-  const data = await response.json()
-
-  // Parse the JSON strings returned by the Java backend
-  return data
-    .map((deviceJson: string) => {
-      try {
-        return JSON.parse(deviceJson)
-      } catch (e) {
-        console.error("Failed to parse device JSON:", deviceJson)
-        return null
-      }
-    })
-    .filter(Boolean)
+  return response.json()
 }
 
-export async function toggleDevice(deviceId: string): Promise<void> {
+export async function toggleDevice(deviceId: string): Promise<DeviceData> {
   const response = await fetch(`${API_BASE_URL}/device/${deviceId}/toggle`, {
     method: "POST",
+    headers: getAuthHeaders(),
   })
 
   if (!response.ok) {
     throw new Error(`Failed to toggle device: ${response.status}`)
   }
+  return response.json()
+}
+
+export async function updateDeviceSettings(deviceId: string, settings: Partial<DeviceData>): Promise<DeviceData> {
+  const response = await fetch(`${API_BASE_URL}/device/${deviceId}/settings`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(settings)
+  })
+
+  if (!response.ok) {
+    throw new Error(`Failed to update device settings: ${response.status}`)
+  }
+  return response.json()
 }
 
 export async function setBrightness(deviceId: string, brightness: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/light/${deviceId}/brightness?brightness=${brightness}`, {
-    method: "POST",
-  })
-
-  if (!response.ok) {
-    throw new Error(`Failed to set brightness: ${response.status}`)
-  }
+  await updateDeviceSettings(deviceId, { brightness })
 }
 
 export async function setTemperature(deviceId: string, temperature: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/thermostat/${deviceId}/temperature?temperature=${temperature}`, {
-    method: "POST",
-  })
-
-  if (!response.ok) {
-    throw new Error(`Failed to set temperature: ${response.status}`)
-  }
+  await updateDeviceSettings(deviceId, { temperature })
 }
 
-export async function toggleRecording(deviceId: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/camera/${deviceId}/recording`, {
-    method: "POST",
-  })
-
-  if (!response.ok) {
-    throw new Error(`Failed to toggle recording: ${response.status}`)
-  }
+export async function toggleRecording(deviceId: string, currentStatus: boolean): Promise<void> {
+  await updateDeviceSettings(deviceId, { recording: !currentStatus })
 }
 
 export async function setVolume(deviceId: string, volume: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/speaker/${deviceId}/volume?volume=${volume}`, {
-    method: "POST",
-  })
-
-  if (!response.ok) {
-    throw new Error(`Failed to set volume: ${response.status}`)
-  }
+  await updateDeviceSettings(deviceId, { volume })
 }
-

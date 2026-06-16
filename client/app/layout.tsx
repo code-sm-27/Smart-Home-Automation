@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   title: 'Smart Home Automation',
   description: 'Control your smart devices from anywhere',
   icons: {
-    icon: '/favicon.ico', // You can replace this with your own logo/favicon
+    icon: '/favicon.ico', 
   },
 }
 
